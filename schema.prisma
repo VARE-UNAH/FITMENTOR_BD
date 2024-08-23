@@ -1,0 +1,187 @@
+// Este es tu archivo de esquema Prisma
+// Aprende más en la documentación: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Person {
+  id             Int     @id @default(autoincrement())
+  dni            String? @db.VarChar(13)
+  firstName      String  @db.VarChar(45)
+  middleName     String? @db.VarChar(45)
+  lastName       String  @db.VarChar(45)
+  secondLastName String? @db.VarChar(45)
+  phoneNumber    String? @db.VarChar(20)
+  user           User?
+}
+
+model Image {
+  id          Int      @id @default(autoincrement())
+  userId      Int // Llave foránea para User
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url         String   @db.VarChar(255) // URL de la imagen en Azure Blob Storage
+  contentType String   @db.VarChar(50) // Tipo de contenido de la imagen, por ejemplo, 'image/jpeg'
+  size        Int // Tamaño de la imagen en bytes
+  createdAt   DateTime @default(now()) // Fecha en la que se almacenó la imagen
+  avatar      Boolean  @default(false)
+}
+
+model User {
+  id          Int     @id @default(autoincrement())
+  active      Boolean @default(true)
+  personId    Int     @unique
+  email       String  @unique @db.VarChar(100)
+  firebaseUid String? @unique @db.VarChar(128)
+  verified    Boolean @default(false)
+  person      Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  Plan        Plan[]
+  images      Image[]
+}
+
+model Client {
+  id             Int            @id @default(autoincrement())
+  active         Boolean        @default(true)
+  dni            String         @unique @db.VarChar(13)
+  email          String         @unique @db.VarChar(100)
+  firstName      String         @db.VarChar(45)
+  middleName     String?        @db.VarChar(45)
+  lastName       String         @db.VarChar(45)
+  secondLastName String?        @db.VarChar(45)
+  phoneNumber    String?        @db.VarChar(20)
+  age            Int
+  height         Float
+  planId         Int
+  plan           Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  progress       Progress[]
+  TrainingPlan   Training_Plan?
+  FoodPlan       Food_Plan?
+}
+
+model Progress {
+  id       Int      @id @default(autoincrement())
+  date     DateTime @default(now())
+  IMC      Float?
+  fatperc  Int?
+  weight   Float
+  clientId Int
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model Plan {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  name        String?  @db.VarChar(100)
+  description String?  @db.VarChar(225)
+  price       Float // Precio en formato decimal
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clients     Client[]
+}
+
+model Training_Plan {
+  id         Int            @id @default(autoincrement())
+  ClientId   Int            @unique
+  IH         Int
+  FH         Int
+  Client     Client         @relation(fields: [ClientId], references: [id], onDelete: Cascade)
+  TraingDays Training_Day[]
+}
+
+model Training_Day {
+  id              Int                     @id @default(autoincrement())
+  Training_Plan   Training_Plan           @relation(fields: [training_PlanId], references: [id])
+  training_PlanId Int
+  Day             Day                     @relation(fields: [dayId], references: [id])
+  name            String?                 @db.VarChar(50)
+  dayId           Int
+  exercises       Training_Day_Exercise[] // Relación con ejercicios del día
+  Trained_Day     Trained_Day[]
+}
+
+model Trained_Day {
+  id             Int          @id @default(autoincrement())
+  date           DateTime     @default(now())
+  trained        Boolean
+  TrainingDay    Training_Day @relation(fields: [training_DayId], references: [id])
+  training_DayId Int
+}
+
+model Exercise {
+  id              Int                     @id @default(autoincrement())
+  name            String                  @db.VarChar(40)
+  MuscularGroupId Int
+  muscularGroup   MuscularGroup           @relation(fields: [MuscularGroupId], references: [id])
+  trainingDays    Training_Day_Exercise[] // Relación con días de entrenamiento
+}
+
+model MuscularGroup {
+  id        Int        @id @default(autoincrement())
+  name      String     @db.VarChar(40)
+  exercises Exercise[] // Relación con ejercicios
+}
+
+model Training_Day_Exercise {
+  trainingDayId Int
+  exerciseId    Int
+  sets          Int? // Número de sets para el ejercicio en ese día
+  reps          Int? // Número de repeticiones para el ejercicio en ese día
+  weight        Float? // Peso utilizado para el ejercicio en ese día
+
+  trainingDay Training_Day @relation(fields: [trainingDayId], references: [id], onDelete: Cascade)
+  exercise    Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@id([trainingDayId, exerciseId])
+}
+
+model Day {
+  id           Int            @id @default(autoincrement())
+  name         String         @db.VarChar(10)
+  TrainingDays Training_Day[]
+  FoodDays      Food_Day[]
+}
+
+model Food_Plan {
+  id       Int    @id @default(autoincrement())
+  ClientId Int    @unique
+  Client   Client @relation(fields: [ClientId], references: [id], onDelete: Cascade)
+  Food_Day Food_Day[]
+}
+
+model Food_Day {
+  id            Int        @id @default(autoincrement())
+  Food_Plan     Food_Plan  @relation(fields: [Food_PlanId], references: [id])
+  Food_PlanId   Int
+  Day           Day        @relation(fields: [dayId], references: [id])
+  name          String?    @db.VarChar(50)
+  dayId         Int
+  foodTimes     Food_Time[] // A day has multiple food times
+}
+
+model Food_Time {
+  id             Int           @id @default(autoincrement())
+  FoodDay        Food_Day      @relation(fields: [foodDayId], references: [id])
+  foodDayId      Int
+  FoodTimeType   FoodTimeType  @relation(fields: [foodTimeTypeId], references: [id])
+  foodTimeTypeId Int
+  foodItems      Food[]        @relation("FoodTimeFood")
+}
+
+model FoodTimeType {
+  id             Int           @id @default(autoincrement())
+  typeName       String        @db.VarChar(40)
+  foodTimes      Food_Time[]   // A type has multiple food times
+}
+
+model Food {
+  id              Int                     @id @default(autoincrement())
+  name            String                  @db.VarChar(40)
+  calories        Int
+  foodTimes       Food_Time[]             @relation("FoodTimeFood")
+}
+
+
